@@ -1,0 +1,105 @@
+name: CI/CD
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - "v*"
+  pull_request:
+    branches:
+      - main
+
+concurrency:
+  group: ci-cd-${{ github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/v') }}
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build PocketBook App
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate release tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          TAG="$GITHUB_REF_NAME"
+          if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+(\.[0-9]+)?(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::Release tag must use a leading v, for example v1.0 or v1.0.0."
+            exit 1
+          fi
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Run tests
+        run: go test ./...
+
+      - name: Build PocketBook binary
+        run: |
+          docker run --rm \
+            -v "$GITHUB_WORKSPACE":/src \
+            -w /src \
+            --net=host \
+            5keeve/pocketbook-go-sdk:6.3.0-b288-v1 \
+            build -o pb-ftp.app ./cmd/app
+
+      - name: Prepare package
+        id: package
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            PACKAGE_NAME="pb-ftp-${GITHUB_REF_NAME}.tar.gz"
+          else
+            PACKAGE_NAME="pb-ftp-${GITHUB_SHA}.tar.gz"
+          fi
+
+          mkdir -p release-artifacts/package
+          cp pb-ftp.app release-artifacts/package/
+          cp assets/vsftpd release-artifacts/package/
+          cp assets/vsftpd.conf release-artifacts/package/
+          tar -czf "release-artifacts/${PACKAGE_NAME}" -C release-artifacts/package .
+
+          echo "package_name=${PACKAGE_NAME}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload package
+        uses: actions/upload-artifact@v4
+        with:
+          name: pb-ftp-package
+          path: release-artifacts/${{ steps.package.outputs.package_name }}
+          if-no-files-found: error
+          retention-days: 14
+
+  release:
+    name: Publish Release
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download package
+        uses: actions/download-artifact@v4
+        with:
+          name: pb-ftp-package
+          path: release-artifacts
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ github.ref_name }}
+          tag_name: ${{ github.ref_name }}
+          files: release-artifacts/pb-ftp-${{ github.ref_name }}.tar.gz
+          generate_release_notes: true
+          fail_on_unmatched_files: true

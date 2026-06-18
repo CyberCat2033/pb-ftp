@@ -1,0 +1,28 @@
+# ---- Go ----
+/bin/
+*.exe
+*.exe~
+*.out
+*.test
+*.prof
+*.coverage
+*.app
+release-artifacts/
+*.log
+
+# Go workspace and vendor artifacts
+/go.work
+/vendor/
+
+# IDE/editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Temporary and system files
+.DS_Store
+Thumbs.db
+*~
+
+# Build script is kept out of repo for now
