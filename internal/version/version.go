@@ -1,15 +1,11 @@
 package version
 
 import (
-	"encoding/json"
-	"os"
 	"strconv"
 )
 
 const (
-	AppName                = "pb-ftp"
-	VersionFileName        = "pb-ftp.version"
-	DefaultVersionFilePath = "/mnt/ext1/applications/" + VersionFileName
+	AppName = "pb-ftp"
 )
 
 var (
@@ -39,25 +35,4 @@ func Current() Info {
 		VersionCode:   code,
 		ReleasedAt:    BuildTime,
 	}
-}
-
-func ReadInstalled(path string) (Info, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return Current(), err
-	}
-
-	var info Info
-	if err := json.Unmarshal(data, &info); err != nil {
-		return Current(), err
-	}
-
-	if info.SchemaVersion == 0 {
-		info.SchemaVersion = 1
-	}
-	if info.AppName == "" {
-		info.AppName = AppName
-	}
-
-	return info, nil
 }

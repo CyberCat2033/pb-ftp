@@ -15,9 +15,8 @@ import (
 const minRescanInterval = 5 * time.Second
 
 type Server struct {
-	httpServer      *http.Server
-	rescanner       *Rescanner
-	versionFilePath string
+	httpServer *http.Server
+	rescanner  *Rescanner
 }
 
 type Rescanner struct {
@@ -27,15 +26,10 @@ type Rescanner struct {
 }
 
 func Start(address string) (*Server, error) {
-	return StartWithVersionFile(address, version.DefaultVersionFilePath)
-}
-
-func StartWithVersionFile(address string, versionFilePath string) (*Server, error) {
 	rescanner := &Rescanner{}
 	mux := http.NewServeMux()
 	server := &Server{
-		rescanner:       rescanner,
-		versionFilePath: versionFilePath,
+		rescanner: rescanner,
 	}
 
 	mux.HandleFunc("/rescan", rescanner.handleRescan)
@@ -91,10 +85,8 @@ func (s *Server) handleVersion(w http.ResponseWriter, request *http.Request) {
 		return
 	}
 
-	info, _ := version.ReadInstalled(s.versionFilePath)
-
 	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(info)
+	_ = json.NewEncoder(w).Encode(version.Current())
 }
 
 func (r *Rescanner) Trigger() (string, error) {
