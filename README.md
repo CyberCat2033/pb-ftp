@@ -205,7 +205,7 @@ go test ./...
 
 - собирает `pb-ftp.app`;
 - публикует в GitHub Release архив `pb-ftp-vX.Y.Z.tar.gz`;
-- публикует отдельный asset `pb-ftp-vX.Y.Z.app`;
+- публикует отдельный asset `pb-ftp-vX.Y.Z.pbapp` с бинарником лаунчера;
 - публикует отдельный asset `pb-ftp-vX.Y.Z.version`;
 - обновляет GitHub Pages manifest `updates/latest.json`.
 

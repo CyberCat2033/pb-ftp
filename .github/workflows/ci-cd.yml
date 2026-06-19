@@ -81,7 +81,7 @@ jobs:
           RELEASED_AT="${{ steps.version.outputs.released_at }}"
           ARTIFACT_SUFFIX="${{ steps.version.outputs.artifact_suffix }}"
           PACKAGE_NAME="pb-ftp-${ARTIFACT_SUFFIX}.tar.gz"
-          APP_NAME="pb-ftp-${ARTIFACT_SUFFIX}.app"
+          APP_NAME="pb-ftp-${ARTIFACT_SUFFIX}.pbapp"
           VERSION_FILE_NAME="pb-ftp-${ARTIFACT_SUFFIX}.version"
 
           mkdir -p release-artifacts/package
@@ -194,7 +194,7 @@ jobs:
           tag_name: ${{ github.ref_name }}
           files: |
             release-artifacts/pb-ftp-${{ github.ref_name }}.tar.gz
-            release-artifacts/pb-ftp-${{ github.ref_name }}.app
+            release-artifacts/pb-ftp-${{ github.ref_name }}.pbapp
             release-artifacts/pb-ftp-${{ github.ref_name }}.version
           generate_release_notes: true
           fail_on_unmatched_files: true
