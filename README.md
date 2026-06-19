@@ -205,8 +205,8 @@ go test ./...
 
 - собирает `pb-ftp.app`;
 - публикует в GitHub Release архив `pb-ftp-vX.Y.Z.tar.gz`;
-- публикует отдельный asset `pb-ftp-vX.Y.Z.pbapp` с бинарником лаунчера;
 - публикует отдельный asset `pb-ftp-vX.Y.Z.version`;
+- публикует файл лаунчера `pb-ftp-vX.Y.Z.app` в GitHub Pages рядом с manifest;
 - обновляет GitHub Pages manifest `updates/latest.json`.
 
 Ожидаемый URL манифеста для Android-приложения:
@@ -216,6 +216,8 @@ https://cybercat2033.github.io/pb-ftp/updates/latest.json
 ```
 
 `pb-ftp` не обновляет себя самостоятельно. Обновлением лаунчера на книжке должно заниматься Android-приложение: оно читает manifest, сравнивает версию с `GET /version`, скачивает `launcher` и `version` artifacts, проверяет `sha256` и загружает их по FTP в пути из `installPath`.
+
+Файл `.app` публикуется через GitHub Pages, потому что GitHub Release API отклоняет release asset с расширением `.app`.
 
 Для публикации manifest в GitHub Pages у репозитория должна быть включена Pages-публикация из GitHub Actions. Workflow уже запрашивает нужные permissions:
 

@@ -81,7 +81,7 @@ jobs:
           RELEASED_AT="${{ steps.version.outputs.released_at }}"
           ARTIFACT_SUFFIX="${{ steps.version.outputs.artifact_suffix }}"
           PACKAGE_NAME="pb-ftp-${ARTIFACT_SUFFIX}.tar.gz"
-          APP_NAME="pb-ftp-${ARTIFACT_SUFFIX}.pbapp"
+          APP_NAME="pb-ftp-${ARTIFACT_SUFFIX}.app"
           VERSION_FILE_NAME="pb-ftp-${ARTIFACT_SUFFIX}.version"
 
           mkdir -p release-artifacts/package
@@ -118,8 +118,13 @@ jobs:
           ARTIFACT_DIR="release-artifacts"
           SITE_DIR="site/updates"
           RELEASE_URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}"
+          REPO_OWNER="${GITHUB_REPOSITORY_OWNER,,}"
+          REPO_NAME="${GITHUB_REPOSITORY#*/}"
+          PAGES_URL="https://${REPO_OWNER}.github.io/${REPO_NAME}/updates"
 
           mkdir -p "$SITE_DIR"
+          cp "$ARTIFACT_DIR/$APP_NAME" "$SITE_DIR/$APP_NAME"
+          cp "$ARTIFACT_DIR/$VERSION_FILE_NAME" "$SITE_DIR/$VERSION_FILE_NAME"
 
           cat > "$SITE_DIR/latest.json" <<EOF
           {
@@ -134,7 +139,7 @@ jobs:
                 "type": "launcher",
                 "fileName": "$APP_NAME",
                 "installPath": "/mnt/ext1/applications/pb-ftp.app",
-                "url": "$RELEASE_URL/$APP_NAME",
+                "url": "$PAGES_URL/$APP_NAME",
                 "sha256": "$(sha256sum "$ARTIFACT_DIR/$APP_NAME" | cut -d ' ' -f 1)",
                 "sizeBytes": $(stat -c%s "$ARTIFACT_DIR/$APP_NAME")
               },
@@ -142,7 +147,7 @@ jobs:
                 "type": "version",
                 "fileName": "$VERSION_FILE_NAME",
                 "installPath": "/mnt/ext1/applications/pb-ftp.version",
-                "url": "$RELEASE_URL/$VERSION_FILE_NAME",
+                "url": "$PAGES_URL/$VERSION_FILE_NAME",
                 "sha256": "$(sha256sum "$ARTIFACT_DIR/$VERSION_FILE_NAME" | cut -d ' ' -f 1)",
                 "sizeBytes": $(stat -c%s "$ARTIFACT_DIR/$VERSION_FILE_NAME")
               },
@@ -194,7 +199,6 @@ jobs:
           tag_name: ${{ github.ref_name }}
           files: |
             release-artifacts/pb-ftp-${{ github.ref_name }}.tar.gz
-            release-artifacts/pb-ftp-${{ github.ref_name }}.pbapp
             release-artifacts/pb-ftp-${{ github.ref_name }}.version
           generate_release_notes: true
           fail_on_unmatched_files: true
