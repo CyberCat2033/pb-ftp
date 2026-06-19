@@ -26,15 +26,32 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      - name: Validate release tag
-        if: startsWith(github.ref, 'refs/tags/v')
+      - name: Resolve version
+        id: version
         run: |
-          TAG="$GITHUB_REF_NAME"
-          if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+(\.[0-9]+)?(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$ ]]; then
-            echo "::error::Release tag must use a leading v, for example v1.0 or v1.0.0."
-            exit 1
+          VERSION_CODE="$(git rev-list --count HEAD)"
+          RELEASED_AT="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            TAG="$GITHUB_REF_NAME"
+            if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$ ]]; then
+              echo "::error::Release tag must use SemVer with a leading v, for example v1.0.0."
+              exit 1
+            fi
+            VERSION_NAME="${TAG#v}"
+            ARTIFACT_SUFFIX="$TAG"
+          else
+            VERSION_NAME="0.0.0-${GITHUB_SHA::12}"
+            ARTIFACT_SUFFIX="${GITHUB_SHA}"
           fi
+
+          echo "version_name=$VERSION_NAME" >> "$GITHUB_OUTPUT"
+          echo "version_code=$VERSION_CODE" >> "$GITHUB_OUTPUT"
+          echo "released_at=$RELEASED_AT" >> "$GITHUB_OUTPUT"
+          echo "artifact_suffix=$ARTIFACT_SUFFIX" >> "$GITHUB_OUTPUT"
 
       - name: Set up Go
         uses: actions/setup-go@v5
@@ -52,32 +69,107 @@ jobs:
             -w /src \
             --net=host \
             5keeve/pocketbook-go-sdk:6.3.0-b288-v1 \
-            build -o pb-ftp.app ./cmd/app
+            build \
+              -ldflags "-X pb-ftp/internal/version.VersionName=${{ steps.version.outputs.version_name }} -X pb-ftp/internal/version.VersionCode=${{ steps.version.outputs.version_code }} -X pb-ftp/internal/version.BuildTime=${{ steps.version.outputs.released_at }}" \
+              -o pb-ftp.app ./cmd/app
 
       - name: Prepare package
         id: package
         run: |
-          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
-            PACKAGE_NAME="pb-ftp-${GITHUB_REF_NAME}.tar.gz"
-          else
-            PACKAGE_NAME="pb-ftp-${GITHUB_SHA}.tar.gz"
-          fi
+          VERSION_NAME="${{ steps.version.outputs.version_name }}"
+          VERSION_CODE="${{ steps.version.outputs.version_code }}"
+          RELEASED_AT="${{ steps.version.outputs.released_at }}"
+          ARTIFACT_SUFFIX="${{ steps.version.outputs.artifact_suffix }}"
+          PACKAGE_NAME="pb-ftp-${ARTIFACT_SUFFIX}.tar.gz"
+          APP_NAME="pb-ftp-${ARTIFACT_SUFFIX}.app"
+          VERSION_FILE_NAME="pb-ftp-${ARTIFACT_SUFFIX}.version"
 
           mkdir -p release-artifacts/package
+          cat > release-artifacts/package/pb-ftp.version <<EOF
+          {
+            "schemaVersion": 1,
+            "appName": "pb-ftp",
+            "versionName": "$VERSION_NAME",
+            "versionCode": $VERSION_CODE,
+            "releasedAt": "$RELEASED_AT"
+          }
+          EOF
+
           cp pb-ftp.app release-artifacts/package/
           cp assets/vsftpd release-artifacts/package/
           cp assets/vsftpd.conf release-artifacts/package/
           tar -czf "release-artifacts/${PACKAGE_NAME}" -C release-artifacts/package .
+          cp pb-ftp.app "release-artifacts/${APP_NAME}"
+          cp release-artifacts/package/pb-ftp.version "release-artifacts/${VERSION_FILE_NAME}"
 
           echo "package_name=${PACKAGE_NAME}" >> "$GITHUB_OUTPUT"
+          echo "app_name=${APP_NAME}" >> "$GITHUB_OUTPUT"
+          echo "version_file_name=${VERSION_FILE_NAME}" >> "$GITHUB_OUTPUT"
 
-      - name: Upload package
+      - name: Generate update manifest
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          VERSION_NAME="${{ steps.version.outputs.version_name }}"
+          VERSION_CODE="${{ steps.version.outputs.version_code }}"
+          RELEASED_AT="${{ steps.version.outputs.released_at }}"
+          PACKAGE_NAME="${{ steps.package.outputs.package_name }}"
+          APP_NAME="${{ steps.package.outputs.app_name }}"
+          VERSION_FILE_NAME="${{ steps.package.outputs.version_file_name }}"
+          ARTIFACT_DIR="release-artifacts"
+          SITE_DIR="site/updates"
+          RELEASE_URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}"
+
+          mkdir -p "$SITE_DIR"
+
+          cat > "$SITE_DIR/latest.json" <<EOF
+          {
+            "schemaVersion": 1,
+            "appName": "pb-ftp",
+            "versionName": "$VERSION_NAME",
+            "versionCode": $VERSION_CODE,
+            "releasedAt": "$RELEASED_AT",
+            "changelogUrl": "https://github.com/${GITHUB_REPOSITORY}/releases/tag/${GITHUB_REF_NAME}",
+            "artifacts": [
+              {
+                "type": "launcher",
+                "fileName": "$APP_NAME",
+                "installPath": "/mnt/ext1/applications/pb-ftp.app",
+                "url": "$RELEASE_URL/$APP_NAME",
+                "sha256": "$(sha256sum "$ARTIFACT_DIR/$APP_NAME" | cut -d ' ' -f 1)",
+                "sizeBytes": $(stat -c%s "$ARTIFACT_DIR/$APP_NAME")
+              },
+              {
+                "type": "version",
+                "fileName": "$VERSION_FILE_NAME",
+                "installPath": "/mnt/ext1/applications/pb-ftp.version",
+                "url": "$RELEASE_URL/$VERSION_FILE_NAME",
+                "sha256": "$(sha256sum "$ARTIFACT_DIR/$VERSION_FILE_NAME" | cut -d ' ' -f 1)",
+                "sizeBytes": $(stat -c%s "$ARTIFACT_DIR/$VERSION_FILE_NAME")
+              },
+              {
+                "type": "package",
+                "fileName": "$PACKAGE_NAME",
+                "url": "$RELEASE_URL/$PACKAGE_NAME",
+                "sha256": "$(sha256sum "$ARTIFACT_DIR/$PACKAGE_NAME" | cut -d ' ' -f 1)",
+                "sizeBytes": $(stat -c%s "$ARTIFACT_DIR/$PACKAGE_NAME")
+              }
+            ]
+          }
+          EOF
+
+      - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: pb-ftp-package
-          path: release-artifacts/${{ steps.package.outputs.package_name }}
+          name: pb-ftp-artifacts
+          path: release-artifacts/*
           if-no-files-found: error
           retention-days: 14
+
+      - name: Upload Pages artifact
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
 
   release:
     name: Publish Release
@@ -89,10 +181,10 @@ jobs:
       contents: write
 
     steps:
-      - name: Download package
+      - name: Download build artifacts
         uses: actions/download-artifact@v4
         with:
-          name: pb-ftp-package
+          name: pb-ftp-artifacts
           path: release-artifacts
 
       - name: Publish GitHub Release
@@ -100,6 +192,27 @@ jobs:
         with:
           name: ${{ github.ref_name }}
           tag_name: ${{ github.ref_name }}
-          files: release-artifacts/pb-ftp-${{ github.ref_name }}.tar.gz
+          files: |
+            release-artifacts/pb-ftp-${{ github.ref_name }}.tar.gz
+            release-artifacts/pb-ftp-${{ github.ref_name }}.app
+            release-artifacts/pb-ftp-${{ github.ref_name }}.version
           generate_release_notes: true
           fail_on_unmatched_files: true
+
+  deploy-pages:
+    name: Deploy Update Manifest
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: release
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Deploy GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
