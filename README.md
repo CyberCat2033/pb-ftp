@@ -140,7 +140,7 @@ ftp://anonymous@<ip>:2121/mnt/ext1/
 | --- | --- |
 | Go | 1.23 |
 | Docker | актуальная стабильная версия |
-| PocketBook SDK | `5keeve/pocketbook-go-sdk:6.3.0-b288-v1` |
+| PocketBook build SDK | `5keeve/pocketbook-go-sdk:6.3.0-b288-v1` |
 
 ### Сборка через скрипт
 
@@ -208,6 +208,8 @@ go test ./...
 ---
 
 ## Благодарности
+
+Спасибо **[dennwc](https://github.com/dennwc)** за **[`inkview`](https://github.com/dennwc/inkview)** — Go SDK для PocketBook, на котором построена интеграция с UI и системными возможностями устройства.
 
 Спасибо **[5keeve](https://github.com/5keeve)** за проект **[`pocketbook-go-sdk`](https://github.com/5keeve/pocketbook-go-sdk)**, который упрощает сборку приложений для PocketBook.
 
