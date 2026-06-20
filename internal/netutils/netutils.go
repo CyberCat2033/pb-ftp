@@ -1,7 +1,6 @@
 package netutils
 
 import (
-	"bufio"
 	"errors"
 	"net"
 	"net/url"
@@ -17,7 +16,6 @@ const (
 	vsftpdPath       = "/mnt/ext1/applications/vsftpd"
 	vsftpdConfigPath = "/mnt/ext1/applications/vsftpd.conf"
 	ftpStoragePath   = "/mnt/ext1/"
-	ftpControlAddr   = "127.0.0.1:2121"
 )
 
 type FTPServer struct {
@@ -102,8 +100,6 @@ func (s *FTPServer) Stop() error {
 	default:
 	}
 
-	s.sendQuit()
-
 	if err := s.cmd.Process.Signal(syscall.SIGTERM); err != nil {
 		if errors.Is(err, os.ErrProcessDone) {
 			return nil
@@ -122,19 +118,3 @@ func (s *FTPServer) Stop() error {
 		return nil
 	}
 }
-
-func (s *FTPServer) sendQuit() {
-	conn, err := net.DialTimeout("tcp", ftpControlAddr, ftpQuitTimeout)
-	if err != nil {
-		return
-	}
-	defer conn.Close()
-
-	_ = conn.SetDeadline(time.Now().Add(ftpQuitTimeout))
-	reader := bufio.NewReader(conn)
-	_, _ = reader.ReadString('\n')
-	_, _ = conn.Write([]byte("QUIT\r\n"))
-	_, _ = reader.ReadString('\n')
-}
-
-const ftpQuitTimeout = 750 * time.Millisecond

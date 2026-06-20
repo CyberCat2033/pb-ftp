@@ -1,6 +1,6 @@
 module pb-ftp
 
-go 1.23
+go 1.17
 
 require (
 	github.com/dennwc/inkview v0.3.14

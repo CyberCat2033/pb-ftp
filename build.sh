@@ -4,4 +4,4 @@ docker run --rm \
   -w /src \
   --net=host \
   5keeve/pocketbook-go-sdk:6.3.0-b288-v1 \
-  build -o pb-ftp.app ./cmd/app
+  build -trimpath -ldflags "-s -w" -o pb-ftp.app ./cmd/app

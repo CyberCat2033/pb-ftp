@@ -182,7 +182,7 @@ ftp://anonymous@<ip>:2121/mnt/ext1/
 
 | Компонент | Версия |
 | --- | --- |
-| Go | 1.23 |
+| Go | 1.17 |
 | Docker | актуальная стабильная версия |
 | PocketBook build SDK | `5keeve/pocketbook-go-sdk:6.3.0-b288-v1` |
 
@@ -208,7 +208,7 @@ docker run --rm \
   -w /src \
   --net=host \
   5keeve/pocketbook-go-sdk:6.3.0-b288-v1 \
-  build -o pb-ftp.app ./cmd/app
+  build -trimpath -ldflags "-s -w" -o pb-ftp.app ./cmd/app
 ```
 
 ### Тесты
