@@ -2,7 +2,7 @@
 
 All notable user-facing changes to pb-ftp are documented in this file.
 
-## [Unreleased]
+## [1.0.3] - 2026-06-20
 
 ### Added
 
