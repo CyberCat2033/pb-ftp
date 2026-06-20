@@ -36,6 +36,7 @@ var (
 
 type App struct {
 	drawCount          int
+	currentFTPURL      string
 	restartAfterUpdate bool
 	mu                 sync.Mutex
 }
@@ -45,13 +46,6 @@ func (a *App) Init() error {
 
 	fun, _ = ink.KeepNetwork()
 	ink.ConnectDefault()
-
-	ftpServer, err = netutils.StartVSFTPD()
-	if err != nil {
-		errorText = err.Error()
-		code = nil
-		return nil
-	}
 
 	apiServer, err = control.Start(
 		":"+CONTROLPORT,
@@ -65,24 +59,49 @@ func (a *App) Init() error {
 		return nil
 	}
 
+	a.refreshConnectionState()
+	return nil
+}
+
+func (a *App) refreshConnectionState() {
+	if err := a.ensureFTPServer(); err != nil {
+		errorText = err.Error()
+		code = nil
+		return
+	}
+
 	ip, err := netutils.GetLocalIP()
 	if err != nil {
 		errorText = err.Error()
 		code = nil
-		return nil
+		return
 	}
 
 	output := netutils.GenerateLink(ip, PORT)
+	if code != nil && a.currentFTPURL == output {
+		errorText = ""
+		return
+	}
 
 	code, err = qrcode.New(output, qrcode.High)
 	if err != nil {
 		errorText = err.Error()
 		code = nil
+		return
+	}
+
+	a.currentFTPURL = output
+	errorText = ""
+}
+
+func (a *App) ensureFTPServer() error {
+	if ftpServer != nil && ftpServer.Running() {
 		return nil
 	}
 
-	errorText = ""
-	return nil
+	var err error
+	ftpServer, err = netutils.StartVSFTPD()
+	return err
 }
 
 func drawCenteredStringInRect(y int, text string, font *ink.Font, cl color.Color, bounds image.Rectangle, fontSize int) int {
@@ -236,6 +255,8 @@ func drawCenteredString(y int, text string, font *ink.Font, cl color.Color, scre
 }
 
 func (a *App) Draw() {
+	a.refreshConnectionState()
+
 	ink.ClearScreen()
 	size := ink.ScreenSize()
 	width := size.X

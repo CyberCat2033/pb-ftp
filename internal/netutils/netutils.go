@@ -23,6 +23,8 @@ type FTPServer struct {
 	done    chan error
 	mu      sync.Mutex
 	stopped bool
+	exited  bool
+	exitErr error
 }
 
 func GenerateLink(host string, port string) string {
@@ -81,6 +83,32 @@ func StartVSFTPD() (*FTPServer, error) {
 	return server, nil
 }
 
+func (s *FTPServer) Running() bool {
+	if s == nil || s.cmd == nil || s.cmd.Process == nil {
+		return false
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	return !s.stopped && !s.exitedLocked()
+}
+
+func (s *FTPServer) exitedLocked() bool {
+	if s.exited {
+		return true
+	}
+
+	select {
+	case err := <-s.done:
+		s.exited = true
+		s.exitErr = err
+		return true
+	default:
+		return false
+	}
+}
+
 func (s *FTPServer) Stop() error {
 	if s == nil || s.cmd == nil || s.cmd.Process == nil {
 		return nil
@@ -94,10 +122,8 @@ func (s *FTPServer) Stop() error {
 	}
 	s.stopped = true
 
-	select {
-	case <-s.done:
+	if s.exitedLocked() {
 		return nil
-	default:
 	}
 
 	if err := s.cmd.Process.Signal(syscall.SIGTERM); err != nil {
@@ -108,13 +134,16 @@ func (s *FTPServer) Stop() error {
 	}
 
 	select {
-	case <-s.done:
+	case err := <-s.done:
+		s.exited = true
+		s.exitErr = err
 		return nil
 	case <-time.After(2 * time.Second):
 		if err := s.cmd.Process.Kill(); err != nil && !errors.Is(err, os.ErrProcessDone) {
 			return err
 		}
-		<-s.done
+		s.exitErr = <-s.done
+		s.exited = true
 		return nil
 	}
 }
