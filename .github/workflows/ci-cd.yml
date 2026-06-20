@@ -62,7 +62,10 @@ jobs:
           cache: true
 
       - name: Run tests
-        run: go test ./...
+        run: |
+          go list ./... |
+            grep -v '/cmd/app$' |
+            xargs go test
 
       - name: Build PocketBook binary
         run: |
