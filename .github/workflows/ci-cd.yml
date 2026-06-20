@@ -109,7 +109,10 @@ jobs:
           PAGES_URL="https://${REPO_OWNER}.github.io/${REPO_NAME}/updates"
 
           mkdir -p "$SITE_DIR"
+          mkdir -p "$SITE_DIR/changelog"
           cp "$ARTIFACT_DIR/$UPDATE_APP_NAME" "$SITE_DIR/$UPDATE_APP_NAME"
+          cp CHANGELOG.md "$SITE_DIR/changelog/CHANGELOG.md"
+          cp CHANGELOG.ru.md "$SITE_DIR/changelog/CHANGELOG.ru.md"
 
           cat > "$SITE_DIR/latest.json" <<EOF
           {
@@ -119,7 +122,11 @@ jobs:
             "versionCode": $VERSION_CODE,
             "buildId": "$BUILD_ID",
             "releasedAt": "$RELEASED_AT",
-            "changelogUrl": "https://github.com/${GITHUB_REPOSITORY}/releases/tag/${GITHUB_REF_NAME}",
+            "changelogUrl": "$PAGES_URL/changelog/CHANGELOG.md",
+            "changelogUrls": {
+              "en": "$PAGES_URL/changelog/CHANGELOG.md",
+              "ru": "$PAGES_URL/changelog/CHANGELOG.ru.md"
+            },
             "artifacts": [
               {
                 "type": "launcher",
