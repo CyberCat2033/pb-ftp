@@ -163,7 +163,7 @@ ftp://anonymous@<ip>:2121/mnt/ext1/
 }
 ```
 
-`pb-ftp` принимает только clean absolute path внутри staging-каталога, проверяет checksum, запрещает downgrade по `versionCode`, сохраняет текущий launcher как `pb-ftp.app.previous`, атомарно переносит staged-файл в `pb-ftp.app` и перезапускает себя через новый launcher.
+`pb-ftp` принимает только clean absolute path внутри staging-каталога, проверяет checksum, запрещает downgrade по `versionCode`, сохраняет текущий launcher как `pb-ftp.app.previous`, атомарно переносит staged-файл в `pb-ftp.app`, запускает стандартное сканирование накопителя и перезапускает себя через новый launcher. Endpoint игнорирует неизвестные JSON-поля, чтобы Android-клиент мог добавлять необязательные метаданные без поломки старого сервера.
 
 ---
 

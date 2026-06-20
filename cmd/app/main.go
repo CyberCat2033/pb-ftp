@@ -207,7 +207,8 @@ func (a *App) applyUpdateAndRestart(request control.UpdateRequest) error {
 	a.mu.Unlock()
 
 	go func() {
-		time.Sleep(250 * time.Millisecond)
+		_ = rescan.TriggerDefault()
+		time.Sleep(750 * time.Millisecond)
 		ink.Exit()
 	}()
 

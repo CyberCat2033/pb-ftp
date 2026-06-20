@@ -129,7 +129,6 @@ func (s *Server) handleUpdate(w http.ResponseWriter, request *http.Request) {
 	defer request.Body.Close()
 	reader := io.LimitReader(request.Body, maxUpdateRequestBytes)
 	decoder := json.NewDecoder(reader)
-	decoder.DisallowUnknownFields()
 
 	var updateRequest UpdateRequest
 	if err := decoder.Decode(&updateRequest); err != nil {
