@@ -36,3 +36,20 @@ func TestCurrent(t *testing.T) {
 		t.Fatalf("BuildID = %q, want abcdef123456", info.BuildID)
 	}
 }
+
+func TestDisplayName(t *testing.T) {
+	oldVersionName := VersionName
+	t.Cleanup(func() {
+		VersionName = oldVersionName
+	})
+
+	VersionName = "1.2.3"
+	if got, want := DisplayName(), "pb-ftp 1.2.3"; got != want {
+		t.Fatalf("DisplayName() = %q, want %q", got, want)
+	}
+
+	VersionName = ""
+	if got, want := DisplayName(), "pb-ftp"; got != want {
+		t.Fatalf("DisplayName() with empty version = %q, want %q", got, want)
+	}
+}

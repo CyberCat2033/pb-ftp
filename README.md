@@ -153,7 +153,7 @@ ftp://anonymous@<ip>:2121/mnt/ext1/
 
 ```json
 {
-  "sourcePath": "/mnt/ext1/applications/.pb-ftp-update/pb-ftp-v1.0.1.app",
+  "sourcePath": "/mnt/ext1/applications/.pb-ftp-update/pb-ftp.app",
   "versionName": "1.0.1",
   "versionCode": 124,
   "buildId": "abcdef123456...",
@@ -223,7 +223,7 @@ go test ./...
 
 - собирает `pb-ftp.app`;
 - публикует в GitHub Release архив `pb-ftp-vX.Y.Z.tar.gz`;
-- публикует файл лаунчера `pb-ftp-vX.Y.Z.app` в GitHub Pages рядом с manifest;
+- публикует стабильный файл лаунчера `pb-ftp.app` в GitHub Pages рядом с manifest;
 - обновляет GitHub Pages manifest `updates/latest.json`.
 
 Ожидаемый URL манифеста для Android-приложения:
@@ -234,9 +234,7 @@ https://cybercat2033.github.io/pb-ftp/updates/latest.json
 
 Обновлением лаунчера на книжке занимается Android-приложение: оно читает manifest, сравнивает версию с `GET /version`, скачивает `launcher` artifact, проверяет `sha256`, загружает его в staging-каталог по FTP и активирует через `POST /update`. Для старых версий `pb-ftp` без `POST /update` Android-приложение может один раз использовать legacy fallback: загрузить проверенный launcher напрямую в путь из `installPath`.
 
-Manifest также публикует legacy artifact типа `version` с `installPath` `/mnt/ext1/applications/pb-ftp.version`. Новый Android-клиент не использует этот файл, потому что актуальная версия читается из `GET /version`, но artifact остаётся для совместимости с уже выпущенными версиями Android-приложения, которые ожидают `.version` в manifest.
-
-Файл `.app` публикуется через GitHub Pages, потому что GitHub Release API отклоняет release asset с расширением `.app`.
+Файл `.app` публикуется через GitHub Pages как `updates/pb-ftp.app`, потому что GitHub Release API отклоняет release asset с расширением `.app`. Имя launcher-файла остаётся стабильным и совпадает с путём установки на PocketBook; версия хранится в manifest, `GET /version` и верхней строке интерфейса `pb-ftp`.
 
 `versionCode` в release workflow берётся из `GITHUB_RUN_NUMBER`, а `buildId` из git SHA. Поэтому при экстренной перепубликации того же SemVer-тега клиент всё равно отличает новую сборку по монотонному `versionCode` и/или `buildId`; сам `versionName` используется только как человекочитаемая версия.
 

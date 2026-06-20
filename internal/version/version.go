@@ -39,3 +39,10 @@ func Current() Info {
 		BuildID:       BuildID,
 	}
 }
+
+func DisplayName() string {
+	if VersionName == "" {
+		return AppName
+	}
+	return AppName + " " + VersionName
+}

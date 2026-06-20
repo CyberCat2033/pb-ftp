@@ -80,29 +80,17 @@ jobs:
         run: |
           ARTIFACT_SUFFIX="${{ steps.version.outputs.artifact_suffix }}"
           PACKAGE_NAME="pb-ftp-${ARTIFACT_SUFFIX}.tar.gz"
-          APP_NAME="pb-ftp-${ARTIFACT_SUFFIX}.app"
-          VERSION_FILE_NAME="pb-ftp-${ARTIFACT_SUFFIX}.version"
+          UPDATE_APP_NAME="pb-ftp.app"
 
           mkdir -p release-artifacts/package
           cp pb-ftp.app release-artifacts/package/
           cp assets/vsftpd release-artifacts/package/
           cp assets/vsftpd.conf release-artifacts/package/
           tar -czf "release-artifacts/${PACKAGE_NAME}" -C release-artifacts/package .
-          cp pb-ftp.app "release-artifacts/${APP_NAME}"
-          cat > "release-artifacts/${VERSION_FILE_NAME}" <<EOF
-          {
-            "schemaVersion": 1,
-            "appName": "pb-ftp",
-            "versionName": "${{ steps.version.outputs.version_name }}",
-            "versionCode": ${{ steps.version.outputs.version_code }},
-            "buildId": "${{ steps.version.outputs.build_id }}",
-            "releasedAt": "${{ steps.version.outputs.released_at }}"
-          }
-          EOF
+          cp pb-ftp.app "release-artifacts/${UPDATE_APP_NAME}"
 
           echo "package_name=${PACKAGE_NAME}" >> "$GITHUB_OUTPUT"
-          echo "app_name=${APP_NAME}" >> "$GITHUB_OUTPUT"
-          echo "version_file_name=${VERSION_FILE_NAME}" >> "$GITHUB_OUTPUT"
+          echo "update_app_name=${UPDATE_APP_NAME}" >> "$GITHUB_OUTPUT"
 
       - name: Generate update manifest
         if: startsWith(github.ref, 'refs/tags/v')
@@ -112,8 +100,7 @@ jobs:
           BUILD_ID="${{ steps.version.outputs.build_id }}"
           RELEASED_AT="${{ steps.version.outputs.released_at }}"
           PACKAGE_NAME="${{ steps.package.outputs.package_name }}"
-          APP_NAME="${{ steps.package.outputs.app_name }}"
-          VERSION_FILE_NAME="${{ steps.package.outputs.version_file_name }}"
+          UPDATE_APP_NAME="${{ steps.package.outputs.update_app_name }}"
           ARTIFACT_DIR="release-artifacts"
           SITE_DIR="site/updates"
           RELEASE_URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}"
@@ -122,8 +109,7 @@ jobs:
           PAGES_URL="https://${REPO_OWNER}.github.io/${REPO_NAME}/updates"
 
           mkdir -p "$SITE_DIR"
-          cp "$ARTIFACT_DIR/$APP_NAME" "$SITE_DIR/$APP_NAME"
-          cp "$ARTIFACT_DIR/$VERSION_FILE_NAME" "$SITE_DIR/$VERSION_FILE_NAME"
+          cp "$ARTIFACT_DIR/$UPDATE_APP_NAME" "$SITE_DIR/$UPDATE_APP_NAME"
 
           cat > "$SITE_DIR/latest.json" <<EOF
           {
@@ -137,19 +123,11 @@ jobs:
             "artifacts": [
               {
                 "type": "launcher",
-                "fileName": "$APP_NAME",
+                "fileName": "$UPDATE_APP_NAME",
                 "installPath": "/mnt/ext1/applications/pb-ftp.app",
-                "url": "$PAGES_URL/$APP_NAME",
-                "sha256": "$(sha256sum "$ARTIFACT_DIR/$APP_NAME" | cut -d ' ' -f 1)",
-                "sizeBytes": $(stat -c%s "$ARTIFACT_DIR/$APP_NAME")
-              },
-              {
-                "type": "version",
-                "fileName": "$VERSION_FILE_NAME",
-                "installPath": "/mnt/ext1/applications/pb-ftp.version",
-                "url": "$PAGES_URL/$VERSION_FILE_NAME",
-                "sha256": "$(sha256sum "$ARTIFACT_DIR/$VERSION_FILE_NAME" | cut -d ' ' -f 1)",
-                "sizeBytes": $(stat -c%s "$ARTIFACT_DIR/$VERSION_FILE_NAME")
+                "url": "$PAGES_URL/$UPDATE_APP_NAME",
+                "sha256": "$(sha256sum "$ARTIFACT_DIR/$UPDATE_APP_NAME" | cut -d ' ' -f 1)",
+                "sizeBytes": $(stat -c%s "$ARTIFACT_DIR/$UPDATE_APP_NAME")
               },
               {
                 "type": "package",
@@ -197,7 +175,7 @@ jobs:
           TAG="${GITHUB_REF_NAME}"
           REPO_OWNER="${GITHUB_REPOSITORY_OWNER,,}"
           REPO_NAME="${GITHUB_REPOSITORY#*/}"
-          APP_NAME="pb-ftp-${TAG}.app"
+          APP_NAME="pb-ftp.app"
           PAGES_URL="https://${REPO_OWNER}.github.io/${REPO_NAME}/updates"
 
           cat > release-artifacts/release-notes.md <<EOF
@@ -205,16 +183,6 @@ jobs:
 
           - [${APP_NAME}](${PAGES_URL}/${APP_NAME})
           EOF
-
-      - name: Remove old version release asset
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-        run: |
-          ASSET_NAME="pb-ftp-${GITHUB_REF_NAME}.version"
-          if gh release view "${GITHUB_REF_NAME}" --json assets --jq '.assets[].name' | grep -Fxq "$ASSET_NAME"; then
-            gh release delete-asset "${GITHUB_REF_NAME}" "$ASSET_NAME" --yes
-          fi
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v3.0.1

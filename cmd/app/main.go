@@ -11,6 +11,7 @@ import (
 	"pb-ftp/internal/rescan"
 	"pb-ftp/internal/selfupdate"
 	ui "pb-ftp/internal/ui"
+	"pb-ftp/internal/version"
 	"strings"
 	"sync"
 	"syscall"
@@ -286,7 +287,8 @@ func (a *App) Draw() {
 	if fontSmall != nil {
 		fontSmall.SetActive(color.Black)
 	}
-	ink.DrawString(image.Point{X: 20, Y: (topBarHeight - smallFontSize) / 2}, modelName)
+	topBarTextY := (topBarHeight - smallFontSize) / 2
+	ink.DrawString(image.Point{X: 20, Y: topBarTextY}, modelName)
 
 	// Draw battery status on the right
 	batteryVal := ink.BatteryPower()
@@ -296,7 +298,16 @@ func (a *App) Draw() {
 		batteryText += " ⚡"
 	}
 	batteryWidth := ink.StringWidth(batteryText)
-	ink.DrawString(image.Point{X: width - batteryWidth - 20, Y: (topBarHeight - smallFontSize) / 2}, batteryText)
+	ink.DrawString(image.Point{X: width - batteryWidth - 20, Y: topBarTextY}, batteryText)
+
+	versionText := version.DisplayName()
+	versionWidth := ink.StringWidth(versionText)
+	versionX := (width - versionWidth) / 2
+	leftTextEnd := 20 + ink.StringWidth(modelName)
+	rightTextStart := width - batteryWidth - 20
+	if versionWidth > 0 && versionX > leftTextEnd+20 && versionX+versionWidth < rightTextStart-20 {
+		ink.DrawString(image.Point{X: versionX, Y: topBarTextY}, versionText)
+	}
 
 	// Draw horizontal line separator
 	ink.DrawLine(image.Point{X: 0, Y: topBarHeight}, image.Point{X: width, Y: topBarHeight}, color.Black)
