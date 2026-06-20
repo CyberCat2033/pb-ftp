@@ -81,6 +81,7 @@ jobs:
           ARTIFACT_SUFFIX="${{ steps.version.outputs.artifact_suffix }}"
           PACKAGE_NAME="pb-ftp-${ARTIFACT_SUFFIX}.tar.gz"
           APP_NAME="pb-ftp-${ARTIFACT_SUFFIX}.app"
+          VERSION_FILE_NAME="pb-ftp-${ARTIFACT_SUFFIX}.version"
 
           mkdir -p release-artifacts/package
           cp pb-ftp.app release-artifacts/package/
@@ -88,9 +89,20 @@ jobs:
           cp assets/vsftpd.conf release-artifacts/package/
           tar -czf "release-artifacts/${PACKAGE_NAME}" -C release-artifacts/package .
           cp pb-ftp.app "release-artifacts/${APP_NAME}"
+          cat > "release-artifacts/${VERSION_FILE_NAME}" <<EOF
+          {
+            "schemaVersion": 1,
+            "appName": "pb-ftp",
+            "versionName": "${{ steps.version.outputs.version_name }}",
+            "versionCode": ${{ steps.version.outputs.version_code }},
+            "buildId": "${{ steps.version.outputs.build_id }}",
+            "releasedAt": "${{ steps.version.outputs.released_at }}"
+          }
+          EOF
 
           echo "package_name=${PACKAGE_NAME}" >> "$GITHUB_OUTPUT"
           echo "app_name=${APP_NAME}" >> "$GITHUB_OUTPUT"
+          echo "version_file_name=${VERSION_FILE_NAME}" >> "$GITHUB_OUTPUT"
 
       - name: Generate update manifest
         if: startsWith(github.ref, 'refs/tags/v')
@@ -101,6 +113,7 @@ jobs:
           RELEASED_AT="${{ steps.version.outputs.released_at }}"
           PACKAGE_NAME="${{ steps.package.outputs.package_name }}"
           APP_NAME="${{ steps.package.outputs.app_name }}"
+          VERSION_FILE_NAME="${{ steps.package.outputs.version_file_name }}"
           ARTIFACT_DIR="release-artifacts"
           SITE_DIR="site/updates"
           RELEASE_URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}"
@@ -110,6 +123,7 @@ jobs:
 
           mkdir -p "$SITE_DIR"
           cp "$ARTIFACT_DIR/$APP_NAME" "$SITE_DIR/$APP_NAME"
+          cp "$ARTIFACT_DIR/$VERSION_FILE_NAME" "$SITE_DIR/$VERSION_FILE_NAME"
 
           cat > "$SITE_DIR/latest.json" <<EOF
           {
@@ -128,6 +142,14 @@ jobs:
                 "url": "$PAGES_URL/$APP_NAME",
                 "sha256": "$(sha256sum "$ARTIFACT_DIR/$APP_NAME" | cut -d ' ' -f 1)",
                 "sizeBytes": $(stat -c%s "$ARTIFACT_DIR/$APP_NAME")
+              },
+              {
+                "type": "version",
+                "fileName": "$VERSION_FILE_NAME",
+                "installPath": "/mnt/ext1/applications/pb-ftp.version",
+                "url": "$PAGES_URL/$VERSION_FILE_NAME",
+                "sha256": "$(sha256sum "$ARTIFACT_DIR/$VERSION_FILE_NAME" | cut -d ' ' -f 1)",
+                "sizeBytes": $(stat -c%s "$ARTIFACT_DIR/$VERSION_FILE_NAME")
               },
               {
                 "type": "package",
