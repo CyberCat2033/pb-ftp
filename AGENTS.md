@@ -57,7 +57,7 @@ These instructions define the required working rules for Codex in this repositor
   go test ./...
   ```
 
-- In GitHub Actions, exclude `cmd/app` from the plain Ubuntu unit-test step because it links against PocketBook `inkview`; the workflow still builds `cmd/app` inside the PocketBook SDK Docker image.
+- In GitHub Actions, exclude `cmd/app` and `internal/ui` from the plain Ubuntu unit-test step because they link against PocketBook `inkview`; the workflow still builds the launcher inside the PocketBook SDK Docker image.
 
 - For release workflow or packaging changes, inspect `.github/workflows/ci-cd.yml` and verify the generated manifest shape against the Android client model when possible.
 - If verification cannot be run, state the exact reason and residual risk.
