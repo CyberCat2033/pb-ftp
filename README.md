@@ -27,6 +27,7 @@
 - Текстовая ошибка на экране, если сервер не удалось запустить.
 - Локальный HTTP API `POST /rescan` на порту `2122` для обновления библиотеки после передачи файлов.
 - Локальный HTTP API `GET /version` на порту `2122` для проверки установленной версии лаунчера.
+- Локальный HTTP API `POST /update` на порту `2122` для безопасной активации staged-обновления лаунчера.
 - Запуск стандартного сканера библиотеки PocketBook при закрытии приложения.
 - Удержание сетевого подключения активным, пока приложение открыто.
 
@@ -133,11 +134,35 @@ ftp://anonymous@<ip>:2121/mnt/ext1/
   "appName": "pb-ftp",
   "versionName": "1.0.0",
   "versionCode": 123,
+  "buildId": "abcdef123456...",
   "releasedAt": "2026-06-19T12:00:00Z"
 }
 ```
 
 `GET /version` возвращает версию, прошитую в бинарник при сборке.
+
+### Активировать staged-обновление лаунчера
+
+Клиент должен сначала загрузить новый `.app` по FTP в staging-каталог:
+
+```text
+/mnt/ext1/applications/.pb-ftp-update/
+```
+
+После проверки `sha256` клиент вызывает `POST /update`:
+
+```json
+{
+  "sourcePath": "/mnt/ext1/applications/.pb-ftp-update/pb-ftp-v1.0.1.app",
+  "versionName": "1.0.1",
+  "versionCode": 124,
+  "buildId": "abcdef123456...",
+  "releasedAt": "2026-06-19T12:00:00Z",
+  "sha256": "64_hex_chars"
+}
+```
+
+`pb-ftp` принимает только clean absolute path внутри staging-каталога, проверяет checksum, запрещает downgrade по `versionCode`, сохраняет текущий launcher как `pb-ftp.app.previous`, атомарно переносит staged-файл в `pb-ftp.app` и перезапускает себя через новый launcher.
 
 ---
 
@@ -207,9 +232,11 @@ go test ./...
 https://cybercat2033.github.io/pb-ftp/updates/latest.json
 ```
 
-`pb-ftp` не обновляет себя самостоятельно. Обновлением лаунчера на книжке должно заниматься Android-приложение: оно читает manifest, сравнивает версию с `GET /version`, скачивает `launcher` artifact, проверяет `sha256` и загружает его по FTP в путь из `installPath`.
+Обновлением лаунчера на книжке занимается Android-приложение: оно читает manifest, сравнивает версию с `GET /version`, скачивает `launcher` artifact, проверяет `sha256`, загружает его в staging-каталог по FTP и активирует через `POST /update`. Для старых версий `pb-ftp` без `POST /update` Android-приложение может один раз использовать legacy fallback: загрузить проверенный launcher напрямую в путь из `installPath`.
 
 Файл `.app` публикуется через GitHub Pages, потому что GitHub Release API отклоняет release asset с расширением `.app`.
+
+`versionCode` в release workflow берётся из `GITHUB_RUN_NUMBER`, а `buildId` из git SHA. Поэтому при экстренной перепубликации того же SemVer-тега клиент всё равно отличает новую сборку по монотонному `versionCode` и/или `buildId`; сам `versionName` используется только как человекочитаемая версия.
 
 Для публикации manifest в GitHub Pages у репозитория должна быть включена Pages-публикация из GitHub Actions. Workflow уже запрашивает нужные permissions:
 

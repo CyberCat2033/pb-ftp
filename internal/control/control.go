@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"pb-ftp/internal/rescan"
@@ -13,10 +14,12 @@ import (
 )
 
 const minRescanInterval = 5 * time.Second
+const maxUpdateRequestBytes = 64 * 1024
 
 type Server struct {
-	httpServer *http.Server
-	rescanner  *Rescanner
+	httpServer    *http.Server
+	rescanner     *Rescanner
+	updateHandler UpdateHandler
 }
 
 type Rescanner struct {
@@ -25,15 +28,38 @@ type Rescanner struct {
 	lastStarted time.Time
 }
 
-func Start(address string) (*Server, error) {
+type UpdateRequest struct {
+	SourcePath  string `json:"sourcePath"`
+	VersionName string `json:"versionName"`
+	VersionCode int64  `json:"versionCode"`
+	ReleasedAt  string `json:"releasedAt"`
+	BuildID     string `json:"buildId,omitempty"`
+	SHA256      string `json:"sha256"`
+}
+
+type UpdateHandler func(UpdateRequest) error
+
+type Option func(*Server)
+
+func WithUpdateHandler(handler UpdateHandler) Option {
+	return func(server *Server) {
+		server.updateHandler = handler
+	}
+}
+
+func Start(address string, options ...Option) (*Server, error) {
 	rescanner := &Rescanner{}
 	mux := http.NewServeMux()
 	server := &Server{
 		rescanner: rescanner,
 	}
+	for _, option := range options {
+		option(server)
+	}
 
 	mux.HandleFunc("/rescan", rescanner.handleRescan)
 	mux.HandleFunc("/version", server.handleVersion)
+	mux.HandleFunc("/update", server.handleUpdate)
 
 	server.httpServer = &http.Server{
 		Addr:              address,
@@ -87,6 +113,37 @@ func (s *Server) handleVersion(w http.ResponseWriter, request *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(version.Current())
+}
+
+func (s *Server) handleUpdate(w http.ResponseWriter, request *http.Request) {
+	if request.Method != http.MethodPost {
+		w.Header().Set("Allow", "POST")
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if s.updateHandler == nil {
+		http.Error(w, "update handler unavailable", http.StatusNotFound)
+		return
+	}
+
+	defer request.Body.Close()
+	reader := io.LimitReader(request.Body, maxUpdateRequestBytes)
+	decoder := json.NewDecoder(reader)
+	decoder.DisallowUnknownFields()
+
+	var updateRequest UpdateRequest
+	if err := decoder.Decode(&updateRequest); err != nil {
+		http.Error(w, "invalid update request", http.StatusBadRequest)
+		return
+	}
+	if err := s.updateHandler(updateRequest); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusAccepted)
+	_, _ = fmt.Fprintln(w, `{"status":"accepted","restartRequired":true}`)
 }
 
 func (r *Rescanner) Trigger() (string, error) {

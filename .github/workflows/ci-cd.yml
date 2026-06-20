@@ -32,7 +32,8 @@ jobs:
       - name: Resolve version
         id: version
         run: |
-          VERSION_CODE="$(git rev-list --count HEAD)"
+          VERSION_CODE="$GITHUB_RUN_NUMBER"
+          BUILD_ID="$GITHUB_SHA"
           RELEASED_AT="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
 
           if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
@@ -50,6 +51,7 @@ jobs:
 
           echo "version_name=$VERSION_NAME" >> "$GITHUB_OUTPUT"
           echo "version_code=$VERSION_CODE" >> "$GITHUB_OUTPUT"
+          echo "build_id=$BUILD_ID" >> "$GITHUB_OUTPUT"
           echo "released_at=$RELEASED_AT" >> "$GITHUB_OUTPUT"
           echo "artifact_suffix=$ARTIFACT_SUFFIX" >> "$GITHUB_OUTPUT"
 
@@ -70,7 +72,7 @@ jobs:
             --net=host \
             5keeve/pocketbook-go-sdk:6.3.0-b288-v1 \
             build \
-              -ldflags "-X pb-ftp/internal/version.VersionName=${{ steps.version.outputs.version_name }} -X pb-ftp/internal/version.VersionCode=${{ steps.version.outputs.version_code }} -X pb-ftp/internal/version.BuildTime=${{ steps.version.outputs.released_at }}" \
+              -ldflags "-X pb-ftp/internal/version.VersionName=${{ steps.version.outputs.version_name }} -X pb-ftp/internal/version.VersionCode=${{ steps.version.outputs.version_code }} -X pb-ftp/internal/version.BuildTime=${{ steps.version.outputs.released_at }} -X pb-ftp/internal/version.BuildID=${{ steps.version.outputs.build_id }}" \
               -o pb-ftp.app ./cmd/app
 
       - name: Prepare package
@@ -95,6 +97,7 @@ jobs:
         run: |
           VERSION_NAME="${{ steps.version.outputs.version_name }}"
           VERSION_CODE="${{ steps.version.outputs.version_code }}"
+          BUILD_ID="${{ steps.version.outputs.build_id }}"
           RELEASED_AT="${{ steps.version.outputs.released_at }}"
           PACKAGE_NAME="${{ steps.package.outputs.package_name }}"
           APP_NAME="${{ steps.package.outputs.app_name }}"
@@ -114,6 +117,7 @@ jobs:
             "appName": "pb-ftp",
             "versionName": "$VERSION_NAME",
             "versionCode": $VERSION_CODE,
+            "buildId": "$BUILD_ID",
             "releasedAt": "$RELEASED_AT",
             "changelogUrl": "https://github.com/${GITHUB_REPOSITORY}/releases/tag/${GITHUB_REF_NAME}",
             "artifacts": [

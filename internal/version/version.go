@@ -12,6 +12,7 @@ var (
 	VersionName = "dev"
 	VersionCode = "0"
 	BuildTime   = ""
+	BuildID     = ""
 )
 
 type Info struct {
@@ -20,6 +21,7 @@ type Info struct {
 	VersionName   string `json:"versionName"`
 	VersionCode   int64  `json:"versionCode"`
 	ReleasedAt    string `json:"releasedAt,omitempty"`
+	BuildID       string `json:"buildId,omitempty"`
 }
 
 func Current() Info {
@@ -34,5 +36,6 @@ func Current() Info {
 		VersionName:   VersionName,
 		VersionCode:   code,
 		ReleasedAt:    BuildTime,
+		BuildID:       BuildID,
 	}
 }

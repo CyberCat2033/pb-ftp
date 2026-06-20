@@ -5,12 +5,15 @@ import (
 	"fmt"
 	"image"
 	"image/color"
+	"os"
 	"pb-ftp/internal/control"
 	"pb-ftp/internal/netutils"
 	"pb-ftp/internal/rescan"
+	"pb-ftp/internal/selfupdate"
 	ui "pb-ftp/internal/ui"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	ink "github.com/dennwc/inkview"
@@ -23,16 +26,17 @@ const (
 )
 
 var (
-	code        *qrcode.QRCode
-	errorText   string
-	fun         func()
-	ftpServer   *netutils.FTPServer
-	apiServer   *control.Server
+	code      *qrcode.QRCode
+	errorText string
+	fun       func()
+	ftpServer *netutils.FTPServer
+	apiServer *control.Server
 )
 
 type App struct {
-	drawCount int
-	mu        sync.Mutex
+	drawCount          int
+	restartAfterUpdate bool
+	mu                 sync.Mutex
 }
 
 func (a *App) Init() error {
@@ -48,7 +52,10 @@ func (a *App) Init() error {
 		return nil
 	}
 
-	apiServer, err = control.Start(":" + CONTROLPORT)
+	apiServer, err = control.Start(
+		":"+CONTROLPORT,
+		control.WithUpdateHandler(a.applyUpdateAndRestart),
+	)
 	if err != nil {
 		_ = ftpServer.Stop()
 		ftpServer = nil
@@ -138,13 +145,53 @@ func (a *App) Close() error {
 		cancel()
 	}
 
-	_ = rescan.TriggerDefault()
-
 	if fun != nil {
 		fun()
 	}
 
+	a.mu.Lock()
+	restartAfterUpdate := a.restartAfterUpdate
+	a.mu.Unlock()
+
+	if restartAfterUpdate {
+		if err := syscall.Exec(
+			selfupdate.LauncherPath,
+			[]string{selfupdate.LauncherPath},
+			os.Environ(),
+		); err != nil && firstErr == nil {
+			firstErr = err
+		}
+		return firstErr
+	}
+
+	_ = rescan.TriggerDefault()
+
 	return firstErr
+}
+
+func (a *App) applyUpdateAndRestart(request control.UpdateRequest) error {
+	err := selfupdate.Apply(selfupdate.Request{
+		SourcePath:  request.SourcePath,
+		VersionName: request.VersionName,
+		VersionCode: request.VersionCode,
+		ReleasedAt:  request.ReleasedAt,
+		BuildID:     request.BuildID,
+		SHA256:      request.SHA256,
+	})
+	if err != nil {
+		return err
+	}
+
+	a.mu.Lock()
+	a.restartAfterUpdate = true
+	a.mu.Unlock()
+
+	go func() {
+		time.Sleep(250 * time.Millisecond)
+		ink.Exit()
+	}()
+
+	return nil
 }
 
 func drawCenteredString(y int, text string, font *ink.Font, cl color.Color, screenWidth int, fontSize int) int {
@@ -317,7 +364,6 @@ func (a *App) Draw() {
 
 	// Exit instructions
 	yCur = drawCenteredString(yCur, "Press any key to exit", fontSmall, color.Black, width, smallFontSize)
-
 
 	a.mu.Lock()
 	a.drawCount++
